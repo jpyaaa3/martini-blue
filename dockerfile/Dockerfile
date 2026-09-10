@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYOPENGL_PLATFORM=glx
+    PYOPENGL_PLATFORM=egl
 
 ARG USERNAME=vision
 ARG UID=1000
@@ -28,7 +28,7 @@ WORKDIR /workspace/vision
 COPY . .
 RUN python3 -m pip install --upgrade pip "setuptools>=68,<80" wheel \
     && python3 -m pip install -e ".[test]" \
-    && python3 -c "import genesis, glfw, imgui, OpenGL; print('vision runtime imports ok')"
+    && python3 -c "import genesis, torch, PIL; print('vision runtime imports ok')"
 
 USER ${USERNAME}
 CMD ["sleep", "infinity"]

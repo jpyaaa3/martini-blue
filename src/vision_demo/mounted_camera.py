@@ -7,32 +7,61 @@ from typing import Any
 import numpy as np
 
 
-def forward_camera_offset(
-    position_xyz: tuple[float, float, float] = (0.32, 0.0, 0.28),
+def look_at_camera_offset(
+    position_xyz: tuple[float, float, float],
+    target_xyz: tuple[float, float, float],
 ) -> np.ndarray:
-    """Return camera-to-block transform looking along block +X.
+    """Return a camera-to-vehicle transform looking at a vehicle-frame point."""
 
-    The block frame is +X forward, +Y left and +Z up. Genesis' camera follows
+    position = np.asarray(position_xyz, dtype=np.float64)
+    forward = np.asarray(target_xyz, dtype=np.float64) - position
+    forward_norm = float(np.linalg.norm(forward))
+    if forward_norm <= 1e-9:
+        raise ValueError("camera position and target must be different")
+    forward /= forward_norm
+
+    world_up = np.array((0.0, 0.0, 1.0), dtype=np.float64)
+    right = np.cross(forward, world_up)
+    right_norm = float(np.linalg.norm(right))
+    if right_norm <= 1e-9:
+        raise ValueError("camera view direction cannot be parallel to vehicle up")
+    right /= right_norm
+    camera_up = np.cross(right, forward)
+
+    transform = np.eye(4, dtype=np.float64)
+    transform[:3, :3] = np.column_stack((right, camera_up, -forward))
+    transform[:3, 3] = position
+    return transform
+
+
+def forward_camera_offset(
+    position_xyz: tuple[float, float, float] = (0.30, 0.0, 0.30),
+) -> np.ndarray:
+    """Return camera-to-vehicle transform looking along vehicle +X.
+
+    The vehicle frame is +X forward, +Y left and +Z up. Genesis' camera follows
     the OpenGL convention: +X right, +Y up and -Z forward.
     """
 
-    transform = np.eye(4, dtype=np.float64)
-    transform[:3, :3] = np.array(
-        (
-            (0.0, 0.0, -1.0),
-            (-1.0, 0.0, 0.0),
-            (0.0, 1.0, 0.0),
-        ),
-        dtype=np.float64,
+    return look_at_camera_offset(
+        position_xyz,
+        (position_xyz[0] + 1.0, position_xyz[1], position_xyz[2]),
     )
-    transform[:3, 3] = np.asarray(position_xyz, dtype=np.float64)
-    return transform
+
+
+def third_person_camera_offset(
+    position_xyz: tuple[float, float, float] = (-2.2, 0.0, 0.75),
+    target_xyz: tuple[float, float, float] = (0.25, 0.0, 0.19),
+) -> np.ndarray:
+    """Return a rear, elevated chase-camera transform in the vehicle frame."""
+
+    return look_at_camera_offset(position_xyz, target_xyz)
 
 
 def attach_to_first_link(camera: Any, entity: Any, offset: np.ndarray) -> None:
     links = getattr(entity, "links", None)
     if not links:
-        raise RuntimeError("Genesis block entity exposes no rigid link for the camera")
+        raise RuntimeError("Genesis vehicle entity exposes no rigid link for the camera")
     camera.attach(links[0], np.asarray(offset, dtype=np.float64))
 
 
@@ -67,17 +96,11 @@ def rgb_u8(value: Any) -> np.ndarray:
     return np.ascontiguousarray(image)
 
 
-def render_rgb(camera: Any) -> np.ndarray:
-    if hasattr(camera, "move_to_attach"):
+def render_rgb(camera: Any, *, follow_attachment: bool = True) -> np.ndarray:
+    if follow_attachment and hasattr(camera, "move_to_attach"):
         camera.move_to_attach()
-    try:
-        result = camera.render(rgb=True, depth=False, force_render=True)
-    except TypeError as exc:
-        if "force_render" not in str(exc):
-            raise
-        result = camera.render(rgb=True, depth=False)
+    result = camera.render(rgb=True, depth=False)
     rgb = result[0] if isinstance(result, (tuple, list)) else result
     if rgb is None:
         raise RuntimeError("Genesis camera returned no RGB frame")
     return rgb_u8(rgb)
-

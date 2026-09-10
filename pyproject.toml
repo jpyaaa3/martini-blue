@@ -5,16 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vision-camera-demo"
 version = "0.1.0"
-description = "A two-window Genesis mounted-camera driving demo"
+description = "A browser-based two-view Genesis mounted-camera driving demo"
 requires-python = ">=3.10"
 dependencies = [
   "genesis-world==1.2.0",
   "torch==2.12.1",
   "numpy>=1.26,<2",
-  "glfw==2.10.0",
-  "imgui[glfw]==2.0.0",
-  "PyOpenGL==3.1.10",
-  "PyOpenGL-accelerate==3.1.10",
+  "Pillow==11.3.0",
+  "trimesh>=4.8,<6",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +23,9 @@ vision-demo = "vision_demo.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+vision_demo = ["static/*.html", "assets/*.obj", "assets/*.mtl"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

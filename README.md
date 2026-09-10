@@ -1,57 +1,31 @@
-# Vision camera demo
+# 비전 시뮬레이션
 
-A deliberately small Genesis demo with exactly two native windows:
 
-1. the normal Genesis scene viewer;
-2. a GLFW/ImGui window showing a camera mounted on the moving block.
 
-## Controls
+https://github.com/user-attachments/assets/30df9953-2fb8-44ce-bac0-3bd463d54a97
 
-- `W`: accelerate
-- `S`: brake, then reverse after stopping
-- `A` / `D`: steer left / right
-- `R`: reset pose and speed
-- `Esc`: quit
 
-Keyboard input is accepted while the **Mounted Camera** window has focus.
 
-## Run in the development container
+## 조작법
 
-The container stays alive so the demo can be started repeatedly with
-`docker exec`, as requested.
+- `W`: 가속
+- `S`: 브레이크  및 후진
+- `A` / `D`: 좌회전 / 우회전
+- `Space`: 핸드브레이크
+- `R`: 초기화
+- `Esc`: 종료
+
+## Docker로 실행하기
 
 ```bash
-cd /home/user/ws/vision/dockerfile
-UID=$(id -u) GID=$(id -g) docker compose up -d --build
+# dockerfile/에서
+docker compose up -d --build
 docker exec -it vision-camera-demo vision-demo
 ```
 
-For a CPU trial:
+## Docker 없이 실행하기
 
 ```bash
-docker exec -it -e VISION_BACKEND=cpu vision-camera-demo vision-demo --backend cpu
-```
-
-On native Linux/X11, the host X server must allow the same local UID to open
-windows. WSLg normally works with the mounts and environment in `compose.yaml`.
-The default Compose configuration requires the NVIDIA Container Toolkit because
-it requests `gpus: all`.
-
-Useful checks:
-
-```bash
-docker exec -it vision-camera-demo pytest
-docker exec -it vision-camera-demo python3 -m vision_demo.main --help
-```
-
-## Run without Docker
-
-```bash
-cd /home/user/ws/vision
 python3 -m pip install -e '.[test]'
 vision-demo --backend gpu
 ```
-
-The block motion is kinematic on purpose. There is no waypoint/scenario layer,
-vehicle suspension, networking, recording, depth stream, or configuration UI
-in this first version.

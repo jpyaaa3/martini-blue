@@ -42,8 +42,39 @@ def test_large_frame_time_is_bounded() -> None:
     )
 
 
+def test_handbrake_stops_quickly_and_creates_a_slide() -> None:
+    state = VehicleState(speed_mps=4.0)
+    advance(
+        state,
+        ControlInput(steer_left=True, handbrake=True),
+        0.25,
+    )
+
+    movement_yaw = math.atan2(state.y, state.x)
+    assert state.speed_mps < 4.0
+    assert state.yaw > movement_yaw
+    assert state.drifting is True
+
+
+def test_grip_recovers_after_releasing_handbrake() -> None:
+    state = VehicleState(speed_mps=4.0)
+    advance(state, ControlInput(steer_left=True, handbrake=True), 0.25)
+    gap_while_sliding = abs(state.yaw - state.travel_yaw)
+
+    advance(state, ControlInput(), 0.5)
+
+    assert abs(state.yaw - state.travel_yaw) < gap_while_sliding
+    assert state.drifting is False
+
+
+def test_reset_clears_handbrake_slide() -> None:
+    state = VehicleState(travel_yaw=1.0, drifting=True)
+    state.reset()
+    assert state.travel_yaw == 0.0
+    assert state.drifting is False
+
+
 def test_quaternion_is_wxyz_yaw_rotation() -> None:
     state = VehicleState(yaw=math.pi / 2.0)
     w, x, y, z = state.quaternion_wxyz()
     assert (w, x, y, z) == pytest.approx((math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5)))
-

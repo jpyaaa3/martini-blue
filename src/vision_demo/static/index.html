@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mounted Camera</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #080b11; color: #e9eef8; }
+    main { width: 100vw; height: 100vh; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+    figure { min-width: 0; margin: 0; position: relative; display: grid; place-items: center; background: #05070b; }
+    figure canvas { width: 100%; height: 100%; object-fit: contain; user-select: none; }
+    figcaption { position: absolute; left: 14px; bottom: 14px; padding: 6px 9px; border-radius: 7px; background: #0d1420d9; color: #dbe7f8; }
+    .hud { position: fixed; inset: 18px 18px auto 18px; display: flex; gap: 12px; justify-content: space-between; pointer-events: none; }
+    .card { padding: 10px 13px; border: 1px solid #ffffff24; border-radius: 10px; background: #0d1420d9; backdrop-filter: blur(8px); box-shadow: 0 8px 24px #0008; }
+    #telemetry { font-variant-numeric: tabular-nums; }
+    .help { color: #b6c3d8; }
+    button { pointer-events: auto; color: #fff; background: #c13f4b; border: 0; border-radius: 8px; padding: 9px 13px; font-weight: 700; cursor: pointer; }
+    .offline { opacity: .55; }
+  </style>
+</head>
+<body>
+  <main>
+    <figure>
+      <canvas id="observer" width="640" height="480" aria-label="Observer camera"></canvas>
+      <figcaption>Third-person chase</figcaption>
+    </figure>
+    <figure>
+      <canvas id="mounted" width="640" height="480" aria-label="Mounted camera"></canvas>
+      <figcaption>Mounted camera</figcaption>
+    </figure>
+  </main>
+  <div class="hud">
+    <div class="card">
+      <div id="telemetry">Waiting for simulation…</div>
+      <div class="help">W accelerator · S brake/reverse · A/D steer · Space handbrake · R reset · Esc stop</div>
+    </div>
+    <button id="stop" type="button">Stop simulation</button>
+  </div>
+  <script>
+    const held = new Set();
+    const drivingKeys = new Set(['w', 'a', 's', 'd', 'space']);
+    let reset = false;
+    let stopped = false;
+    const frameAge = {observer: null, mounted: null};
+
+    const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+    function controlKey(event) {
+      return event.code === 'Space' ? 'space' : event.key.toLowerCase();
+    }
+
+    async function pumpFrames(stream) {
+      const canvas = document.getElementById(stream);
+      const context = canvas.getContext('2d', {alpha: false});
+      let sequence = -1;
+      while (!stopped) {
+        try {
+          const response = await fetch(
+            '/frame/' + stream + '.jpg?after=' + sequence,
+            {cache: 'no-store'}
+          );
+          if (!response.ok) {
+            await delay(100);
+            continue;
+          }
+          const nextSequence = Number(response.headers.get('X-Frame-Seq'));
+          const capturedAt = Number(response.headers.get('X-Captured-At-Ms'));
+          const bitmap = await createImageBitmap(await response.blob());
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+          }
+          context.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          if (Number.isFinite(nextSequence)) sequence = nextSequence;
+          if (Number.isFinite(capturedAt)) {
+            frameAge[stream] = Math.max(0, Date.now() - capturedAt);
+          }
+        } catch (_) {
+          await delay(100);
+        }
+      }
+    }
+
+    function sendControl() {
+      if (stopped) return;
+      fetch('/api/control', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({keys: Array.from(held), reset: reset})
+      }).catch(() => {});
+      reset = false;
+    }
+
+    async function stopSimulation() {
+      if (stopped) return;
+      stopped = true;
+      held.clear();
+      await fetch('/api/quit', {method: 'POST'}).catch(() => {});
+      document.body.classList.add('offline');
+    }
+
+    addEventListener('keydown', event => {
+      const key = controlKey(event);
+      if (drivingKeys.has(key)) {
+        held.add(key);
+        event.preventDefault();
+        sendControl();
+      } else if (key === 'r' && !event.repeat) {
+        reset = true;
+        event.preventDefault();
+        sendControl();
+      } else if (key === 'escape') {
+        event.preventDefault();
+        stopSimulation();
+      }
+    });
+    addEventListener('keyup', event => {
+      const key = controlKey(event);
+      if (drivingKeys.has(key)) {
+        held.delete(key);
+        event.preventDefault();
+        sendControl();
+      }
+    });
+    addEventListener('blur', () => {
+      held.clear();
+      sendControl();
+    });
+    document.getElementById('stop').addEventListener('click', stopSimulation);
+    setInterval(sendControl, 50);
+    setInterval(async () => {
+      try {
+        const response = await fetch('/api/state', {cache: 'no-store'});
+        const value = await response.json();
+        document.getElementById('telemetry').textContent =
+          'speed ' + value.speed_mps.toFixed(2) + ' m/s · steer ' +
+          value.steering.toFixed(2) + ' · position ' + value.x.toFixed(2) +
+          ', ' + value.y.toFixed(2) + ' m · camera ' +
+          value.camera_fps.toFixed(1) + ' fps · delay O/M ' +
+          (frameAge.observer ?? '–') + '/' + (frameAge.mounted ?? '–') + ' ms';
+      } catch (_) {}
+    }, 200);
+    pumpFrames('observer');
+    pumpFrames('mounted');
+  </script>
+</body>
+</html>

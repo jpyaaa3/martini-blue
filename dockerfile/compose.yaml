@@ -14,19 +14,22 @@ services:
     stdin_open: true
     tty: true
     gpus: all
+    devices:
+      - /dev/dxg:/dev/dxg
     shm_size: "2gb"
+    ports:
+      - "127.0.0.1:${VISION_PORT:-8765}:8765"
     environment:
-      DISPLAY: "${DISPLAY:-:0}"
-      WAYLAND_DISPLAY: "${WAYLAND_DISPLAY:-wayland-0}"
-      XDG_RUNTIME_DIR: "${XDG_RUNTIME_DIR:-/mnt/wslg/runtime-dir}"
-      PULSE_SERVER: "${PULSE_SERVER:-unix:/mnt/wslg/PulseServer}"
-      PYOPENGL_PLATFORM: glx
+      PYOPENGL_PLATFORM: egl
       VISION_BACKEND: "${VISION_BACKEND:-gpu}"
+      VISION_HOST: "0.0.0.0"
+      VISION_PORT: "8765"
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: all
+      GALLIUM_DRIVER: d3d12
+      MESA_D3D12_DEFAULT_ADAPTER_NAME: NVIDIA
+      LD_LIBRARY_PATH: /usr/lib/wsl/lib:/usr/local/cuda/lib64
     volumes:
       - ..:/workspace/vision
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /mnt/wslg:/mnt/wslg:rw
+      - /usr/lib/wsl:/usr/lib/wsl:ro
     working_dir: /workspace/vision
-
