@@ -29,5 +29,3 @@ docker exec -it vision-camera-demo vision-demo
 python3 -m pip install -e '.[test]'
 vision-demo --backend gpu
 ```
-vehicle suspension, networking, recording, depth stream, or configuration UI
-in this first version.
