@@ -1,0 +1,32 @@
+name: vision-camera-demo
+
+services:
+  vision:
+    build:
+      context: ..
+      dockerfile: dockerfile/Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    image: vision-camera-demo:dev
+    container_name: vision-camera-demo
+    command: ["sleep", "infinity"]
+    stdin_open: true
+    tty: true
+    gpus: all
+    shm_size: "2gb"
+    environment:
+      DISPLAY: "${DISPLAY:-:0}"
+      WAYLAND_DISPLAY: "${WAYLAND_DISPLAY:-wayland-0}"
+      XDG_RUNTIME_DIR: "${XDG_RUNTIME_DIR:-/mnt/wslg/runtime-dir}"
+      PULSE_SERVER: "${PULSE_SERVER:-unix:/mnt/wslg/PulseServer}"
+      PYOPENGL_PLATFORM: glx
+      VISION_BACKEND: "${VISION_BACKEND:-gpu}"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+      - ..:/workspace/vision
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /mnt/wslg:/mnt/wslg:rw
+    working_dir: /workspace/vision
+
