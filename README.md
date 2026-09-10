@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/b325b885-6beb-46d4-b6e7-1c6fb9940dcc
+
 # Vision camera demo
 
 A deliberately small Genesis demo with exactly two native windows:
