@@ -96,7 +96,7 @@ class VisionDemo:
                 ),
             ),
         )
-        car_mesh = asset_dir / "car.obj"
+        car_mesh = asset_dir / "car_textured.obj"
         self.block = self.scene.add_entity(
             gs.morphs.Mesh(
                 file=str(car_mesh),
@@ -106,7 +106,9 @@ class VisionDemo:
                 collision=False,
                 file_meshes_are_zup=True,
             ),
-            surface=gs.surfaces.Rough(color=(0.15, 0.48, 0.90, 1.0)),
+            surface=gs.surfaces.Rough(
+                diffuse_texture=gs.textures.ImageTexture(image_path=str(asset_dir / "car_texture.png")),
+            ),
         )
         self.camera = self.scene.add_camera(
             res=(self.config.camera_width, self.config.camera_height),

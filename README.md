@@ -97,6 +97,11 @@ python3 -m pytest tests/test_recording_browser.py
 
 ## JSON으로 맵 편집하기
 
+차량은 원본 `assets/car.obj`의 형상을 유지한 `car_textured.obj`와
+`car_texture.png` 단일 재질을 사용합니다. 파란 차체, 유리, 램프, 그릴,
+측면 휠 무늬를 포함하며 휠은 입체 부품이 아닌 도색입니다.
+`python3 -m vision_demo.car_texture`로 차량 텍스처와 UV를 재생성할 수 있습니다.
+
 기본 맵은 [default.json](src/vision_demo/maps/default.json)입니다.
 현재의 교차로 3개, 보도 8개, 건물과 나무 배치가 이 파일에 들어 있습니다.
 작은 T자 도로 예제는 [example.json](src/vision_demo/maps/example.json)입니다.
