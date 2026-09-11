@@ -20,6 +20,7 @@ services:
     ports:
       - "127.0.0.1:${VISION_PORT:-8765}:8765"
     environment:
+      DISPLAY: "${DISPLAY:-:0}"
       PYOPENGL_PLATFORM: egl
       VISION_BACKEND: "${VISION_BACKEND:-gpu}"
       VISION_HOST: "0.0.0.0"
@@ -32,4 +33,6 @@ services:
     volumes:
       - ..:/workspace/vision
       - /usr/lib/wsl:/usr/lib/wsl:ro
+      # WSLg XWayland socket for the GLFW/ImGui window.
+      - /mnt/wslg/.X11-unix:/tmp/.X11-unix:ro
     working_dir: /workspace/vision

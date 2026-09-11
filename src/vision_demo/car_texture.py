@@ -8,6 +8,22 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 SIZE = 512
+CAR_TOP = 2.0  # Original OBJ units: 1 unit = 10 mm.
+SURFACE_COLORS = {'camera': '#8b9096', 'lens': '#08090b', 'glass': '#365b70'}
+
+
+def surface_kind(points):
+    if np.max(points[:, 2]) > CAR_TOP + 1e-6:
+        if (np.allclose(points[:, 0], 3.) and
+                np.all((points[:, 2] >= 2.5) & (points[:, 2] <= 3.5)) and
+                np.all(np.abs(points[:, 1]) <= .5)):
+            return 'lens'
+        return 'camera'
+    normal = np.cross(points[1]-points[0], points[2]-points[0])
+    normal /= np.linalg.norm(normal)
+    if .05 < normal[2] < .99:
+        return 'glass'
+    return 'body'
 
 
 def build_car(asset_dir: Path):
@@ -19,7 +35,7 @@ def build_car(asset_dir: Path):
             faces.append([int(v.split('/')[0])-1 for v in line.split()[1:]])
     vertices = np.asarray(vertices)
     low, high = vertices.min(axis=0), vertices.max(axis=0)
-    atlas = Image.new('RGB', (SIZE*3, SIZE*2), '#174b87')
+    atlas = Image.new('RGB', (SIZE*3, SIZE*3), '#174b87')
     # Panels: +/-X, +/-Y, +/-Z. An inset provides a filtering gutter.
     for panel in range(6):
         tile = Image.new('RGB', (SIZE,SIZE), '#2065a5')
@@ -32,13 +48,8 @@ def build_car(asset_dir: Path):
             # World X horizontal and Z vertical. +X is vehicle forward.
             rect(0,0,1,.17,'#14202c')
             rect(.08,.30,.94,.33,'#a5bed0')
-            rect(.345,.59,.965,.965,'#101d2a', '#0c2338',5)
-            rect(.36,.62,.59,.93,'#426981')
-            rect(.62,.62,.95,.93,'#426981')
-            for x in (.595,.965):
-                rect(x,.19,x+.008,.58,'#123c64')
-            rect(.52,.49,.57,.505,'#c1d1df')
-            rect(.88,.49,.93,.505,'#c1d1df')
+            rect(.60,.19,.608,.52,'#123c64')
+            rect(.53,.40,.58,.415,'#c1d1df')
             for x in (.16,.81):
                 cx,cy = point(x,.13)
                 # X/Z have unequal physical spans: compensate so wheels look round.
@@ -57,14 +68,11 @@ def build_car(asset_dir: Path):
             rect(.05,.19,.28,.27,color, '#122638',3)
             rect(.72,.19,.95,.27,color, '#122638',3)
             rect(.36,.10,.64,.16,'#d9e1e5')
-            rect(.34,.60,.66,.965,'#172b3d')
-            rect(.355,.625,.645,.94,'#476b80')
-        elif panel == 4:
-            rect(.06,.36,.94,.64,'#164774')
-            rect(.11,.40,.88,.60,'#337bb7')
-        else:
+        elif panel == 5:
             tile.paste('#18222c',(0,0,SIZE,SIZE))
         atlas.paste(tile, ((panel%3)*SIZE,(panel//3)*SIZE))
+    for index, color in enumerate(SURFACE_COLORS.values()):
+        atlas.paste(color, (index*SIZE, SIZE*2, (index+1)*SIZE, SIZE*3))
     lines = ['mtllib car_textured.mtl','o car','usemtl car_atlas']
     uv, normals, indices = [], [], []
     lines.extend('v %.6f %.6f %.6f' % tuple(v) for v in vertices)
@@ -74,14 +82,17 @@ def build_car(asset_dir: Path):
         normal /= np.linalg.norm(normal)
         axis = int(np.argmax(np.abs(normal)))
         panel = axis*2 + int(normal[axis]<0)
-        # Sloped roof/windshield faces use X-end panels for glazing.
+        kind = surface_kind(points)
         axes = ((1,2),(0,2),(0,1))[axis]
         indices.append([])
         for vertex in face:
             p = (vertices[vertex]-low)/(high-low)
             px = panel%3*SIZE+16+p[axes[0]]*480
             py = panel//3*SIZE+16+(1-p[axes[1]])*480
-            uv.append((px/(SIZE*3),1-py/(SIZE*2)))
+            if kind != 'body':
+                px = (list(SURFACE_COLORS).index(kind)+.5)*SIZE
+                py = 2.5*SIZE
+            uv.append((px/(SIZE*3),1-py/(SIZE*3)))
             normals.append(normal)
             indices[-1].append((vertex+1,len(uv)))
     lines.extend('vt %.9f %.9f' % p for p in uv)

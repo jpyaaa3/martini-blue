@@ -42,6 +42,10 @@ XWayland를 사용하는 Wayland 세션도 DISPLAY와 XAUTHORITY가 필요합니
 
 WSL용 기존 설정:
 
+WSLg 환경에서는 아래 설정이 D3D12 GPU 드라이버와 X11 소켓·DISPLAY를 함께
+전달하므로 `--viewer native`도 사용할 수 있습니다. Compose 설정 변경 후에는
+컨테이너를 재생성해야 하며, 실행 중인 앱과 녹화는 먼저 종료하세요.
+
 ```bash
 # dockerfile/에서
 docker compose up -d --build
@@ -115,7 +119,8 @@ python3 -m pytest tests/test_recording_browser.py
 ## JSON으로 맵 편집하기
 
 차량은 원본 `assets/car.obj`의 형상을 유지한 `car_textured.obj`와
-`car_texture.png` 단일 재질을 사용합니다. 파란 차체, 유리, 램프, 그릴,
+`car_texture.png` 단일 재질을 사용합니다. 20mm 이하의 파란 차체와 경사면 유리,
+20mm 위의 회색 카메라, X=30mm·Z 중심=30mm의 검정 전면을 구분합니다. 램프, 그릴,
 측면 휠 무늬를 포함하며 휠은 입체 부품이 아닌 도색입니다.
 `python3 -m vision_demo.car_texture`로 차량 텍스처와 UV를 재생성할 수 있습니다.
 
