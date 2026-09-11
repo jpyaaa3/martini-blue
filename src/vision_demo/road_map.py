@@ -9,7 +9,7 @@ MM_TO_WORLD_M = 0.01
 ROAD_BLOCK_WIDTH_MM = 80.0
 ROAD_SEGMENT_LENGTH_MM = 60.0
 STRIPE_MM = 10.0
-CURB_WIDTH_MM = STRIPE_MM
+CURB_WIDTH_MM = 12.0
 TILE_THICKNESS_M = 0.01
 ROAD_TOP_Z_M = TILE_THICKNESS_M
 MARKING_Z_OFFSET_M = 0.0005
@@ -199,7 +199,7 @@ def four_way_render_tiles(*, arm_segments: int = 8) -> tuple[MapTile, ...]:
 def crossroad_surround_tiles(*, arm_segments: int = 8) -> tuple[MapTile, ...]:
     """Wrap the four road corners with merged curbs and sidewalk blocks.
 
-    Each corner uses two continuous curb boxes, one 10 x 10 mm curb corner,
+    Each corner uses two continuous curb boxes, one square curb corner,
     and one continuous brown sidewalk box. Road-arm ends remain open.
     """
 
@@ -397,6 +397,7 @@ def three_crossroad_surround_tiles(
     block_size_m = arm_segments * ROAD_SEGMENT_LENGTH_MM * MM_TO_WORLD_M
     curb_width_m = CURB_WIDTH_MM * MM_TO_WORLD_M
     curb_offset_m = (block_size_m - curb_width_m) * 0.5
+    sidewalk_size_m = block_size_m - 2.0 * curb_width_m
     tiles: list[MapTile] = []
     for center_x, center_y in three_crossroad_block_centers(
         arm_segments=arm_segments
@@ -404,7 +405,7 @@ def three_crossroad_surround_tiles(
         tiles.append(
             MapTile(
                 (center_x, center_y),
-                (block_size_m, block_size_m),
+                (sidewalk_size_m, sidewalk_size_m),
                 SIDEWALK,
                 height_m=SIDEWALK_HEIGHT_M,
             )
@@ -412,8 +413,9 @@ def three_crossroad_surround_tiles(
         for x_offset, y_offset, size in (
             (-curb_offset_m, 0.0, (curb_width_m, block_size_m)),
             (curb_offset_m, 0.0, (curb_width_m, block_size_m)),
-            (0.0, -curb_offset_m, (block_size_m, curb_width_m)),
-            (0.0, curb_offset_m, (block_size_m, curb_width_m)),
+            # End these strips at the side strips to avoid coplanar corner faces.
+            (0.0, -curb_offset_m, (sidewalk_size_m, curb_width_m)),
+            (0.0, curb_offset_m, (sidewalk_size_m, curb_width_m)),
         ):
             tiles.append(
                 MapTile(

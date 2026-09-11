@@ -47,9 +47,9 @@ def test_tree_pads_touch_the_road_side_of_the_curb() -> None:
 def test_tree_layout_prioritizes_corners_and_uses_one_midpoint() -> None:
     points = {placement.center_xy_m for placement in street_trees()}
     # Road-facing corners and the single midpoint of the lower-left block.
-    assert {(-14.55, -2.05), (-12.45, -2.05), (-10.35, -2.05)} <= points
+    assert {(-14.53, -2.07), (-12.45, -2.07), (-10.37, -2.07)} <= points
     # Its vertical-road edge also has the far corner and one midpoint.
-    assert {(-10.35, -6.25), (-10.35, -4.15)} <= points
+    assert {(-10.37, -6.23), (-10.37, -4.15)} <= points
 
 
 def test_tree_instances_merge_to_four_material_meshes() -> None:

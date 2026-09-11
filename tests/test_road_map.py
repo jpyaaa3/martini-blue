@@ -92,7 +92,7 @@ def test_crossroad_surround_uses_merged_curbs_and_sidewalks() -> None:
     assert all(min(tile.size_xy_m) == pytest.approx(curb_width_m) for tile in curbs)
     assert all(tile.height_m == CURB_HEIGHT_M for tile in curbs)
     assert all(tile.height_m == SIDEWALK_HEIGHT_M for tile in sidewalks)
-    assert all(tile.size_xy_m == pytest.approx((4.7, 4.7)) for tile in sidewalks)
+    assert all(tile.size_xy_m == pytest.approx((4.68, 4.68)) for tile in sidewalks)
 
 
 def test_bad_road_layout_arguments_are_rejected() -> None:
@@ -127,3 +127,17 @@ def test_three_crossroad_sidewalks_form_eight_city_blocks() -> None:
     assert len([tile for tile in tiles if tile.material == SIDEWALK]) == 8
     assert len([tile for tile in tiles if tile.material == CURB]) == 32
     assert all(abs(y) == pytest.approx(4.15) for _, y in centers)
+
+
+def test_sidewalk_and_curb_rectangles_do_not_overlap() -> None:
+    tiles = three_crossroad_surround_tiles()
+    for index, first in enumerate(tiles):
+        for second in tiles[index + 1:]:
+            overlap = [
+                min(a + wa / 2, b + wb / 2) - max(a - wa / 2, b - wb / 2)
+                for a, wa, b, wb in zip(
+                    first.center_xy_m, first.size_xy_m,
+                    second.center_xy_m, second.size_xy_m,
+                )
+            ]
+            assert min(overlap) <= 1e-9
