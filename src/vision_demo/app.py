@@ -9,27 +9,13 @@ from typing import Any
 
 import numpy as np
 
-from .building_mesh import merge_buildings_by_material
-from .buildings import street_buildings
-from .map_mesh import merge_tiles_by_material
 from .mounted_camera import (
     attach_to_first_link,
     forward_camera_offset,
     render_rgb,
     third_person_camera_offset,
 )
-from .road_map import (
-    ASPHALT,
-    CURB,
-    ROAD_TOP_Z_M,
-    SIDEWALK,
-    WHITE,
-    YELLOW,
-    three_crossroad_render_tiles,
-    three_crossroad_surround_tiles,
-)
-from .tree_mesh import merge_trees_by_material
-from .trees import street_trees
+from .road_map import ROAD_TOP_Z_M
 from .vehicle import VehicleConfig, VehicleState
 from .web_viewer import WebViewer
 
@@ -47,11 +33,6 @@ class AppConfig:
     camera_mount_obj: tuple[float, float, float] = (3.0, 0.0, 3.0)
     sky_color: tuple[float, float, float] = (0.529, 0.808, 0.922)
     ground_color: tuple[float, float, float, float] = (0.45, 0.45, 0.45, 1.0)
-    asphalt_color: tuple[float, float, float, float] = (0.02, 0.02, 0.025, 1.0)
-    road_white: tuple[float, float, float, float] = (0.92, 0.92, 0.90, 1.0)
-    road_yellow: tuple[float, float, float, float] = (1.0, 0.72, 0.02, 1.0)
-    curb_gray: tuple[float, float, float, float] = (0.52, 0.54, 0.56, 1.0)
-    sidewalk_brown: tuple[float, float, float, float] = (0.38, 0.22, 0.10, 1.0)
 
 
 class VisionDemo:
@@ -92,63 +73,21 @@ class VisionDemo:
             gs.morphs.Plane(),
             surface=gs.surfaces.Rough(color=self.config.ground_color),
         )
-        road_surfaces = {
-            ASPHALT: gs.surfaces.Rough(color=self.config.asphalt_color),
-            WHITE: gs.surfaces.Rough(color=self.config.road_white),
-            YELLOW: gs.surfaces.Rough(color=self.config.road_yellow),
-            CURB: gs.surfaces.Rough(color=self.config.curb_gray),
-            SIDEWALK: gs.surfaces.Rough(color=self.config.sidewalk_brown),
-        }
-        map_tiles = (
-            *three_crossroad_render_tiles(),
-            *three_crossroad_surround_tiles(),
-        )
-        for material, mesh in merge_tiles_by_material(map_tiles).items():
-            self.scene.add_entity(
-                gs.morphs.MeshSet(
-                    files=(mesh,),
-                    fixed=True,
-                    collision=False,
-                ),
-                surface=road_surfaces[material],
-            )
         asset_dir = Path(__file__).with_name("assets")
-        building_surfaces = {
-            "house_wall": gs.surfaces.Rough(color=(0.78, 0.68, 0.50, 1.0)),
-            "roof_red": gs.surfaces.Rough(color=(0.48, 0.10, 0.07, 1.0)),
-            "tower_wall": gs.surfaces.Rough(color=(0.38, 0.43, 0.48, 1.0)),
-            "market_wall": gs.surfaces.Rough(color=(0.72, 0.44, 0.12, 1.0)),
-            "door": gs.surfaces.Rough(color=(0.24, 0.12, 0.05, 1.0)),
-            "glass": gs.surfaces.Smooth(color=(0.20, 0.58, 0.82, 1.0)),
-        }
-        for material, mesh in merge_buildings_by_material(
-            asset_dir, street_buildings()
-        ).items():
-            self.scene.add_entity(
-                gs.morphs.MeshSet(
-                    files=(mesh,),
-                    fixed=True,
-                    collision=False,
+        self.scene.add_entity(
+            gs.morphs.Mesh(
+                file=str(asset_dir / "static_scene.obj"),
+                fixed=True,
+                collision=False,
+                decimate=False,
+                file_meshes_are_zup=True,
+            ),
+            surface=gs.surfaces.Rough(
+                diffuse_texture=gs.textures.ImageTexture(
+                    image_path=str(asset_dir / "static_scene.png"),
                 ),
-                surface=building_surfaces[material],
-            )
-        tree_surfaces = {
-            "tree_pad": gs.surfaces.Rough(color=(0.72, 0.62, 0.45, 1.0)),
-            "tree_trunk": gs.surfaces.Rough(color=(0.30, 0.15, 0.06, 1.0)),
-            "leaf_large": gs.surfaces.Rough(color=(0.10, 0.42, 0.12, 0.75)),
-            "leaf_small": gs.surfaces.Rough(color=(0.16, 0.55, 0.18, 0.75)),
-        }
-        for material, mesh in merge_trees_by_material(
-            asset_dir / "tree.obj", street_trees()
-        ).items():
-            self.scene.add_entity(
-                gs.morphs.MeshSet(
-                    files=(mesh,),
-                    fixed=True,
-                    collision=False,
-                ),
-                surface=tree_surfaces[material],
-            )
+            ),
+        )
         car_mesh = asset_dir / "car.obj"
         self.block = self.scene.add_entity(
             gs.morphs.Mesh(
