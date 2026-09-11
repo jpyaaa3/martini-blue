@@ -48,12 +48,29 @@ docker compose up -d --build
 docker exec -it vision-camera-demo vision-demo
 ```
 
-## Docker 없이 실행하기
+## Ubuntu venv로 실행하기
+
+Python 3.10 환경에서 검증했습니다. 저장소 루트에서 실행하세요.
+venv에 포함되지 않는 OpenGL·창 시스템 라이브러리는 Ubuntu에 설치합니다.
 
 ```bash
-python3 -m pip install -e '.[test]'
-vision-demo --backend gpu
+sudo apt-get update
+sudo apt-get install -y python3-venv python3-dev build-essential libgl1 libegl1 libglfw3 libglib2.0-0
 ```
+
+GPU 실행에는 호스트에 NVIDIA 드라이버가 설치되어 있어야 합니다.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+vision-demo --backend gpu --viewer auto
+```
+
+다시 실행할 때는 `source .venv/bin/activate` 후 `vision-demo`를 실행하면 됩니다.
+네이티브 창을 강제하려면 `--viewer native`, 브라우저를 쓰려면 `--viewer web`을 지정하세요.
+Python 의존성 버전은 `pyproject.toml`에서 관리하며 `requirements.txt`가 이를 설치합니다.
 
 ## MP4 녹화
 

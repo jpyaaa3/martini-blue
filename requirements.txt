@@ -1,2 +1,5 @@
--e .
-pytest>=8,<9
+# Run from the repository root: python -m pip install -r requirements.txt
+# Install the application, all runtime dependencies, and test tools.
+# Versions are maintained in pyproject.toml (including Genesis, Torch,
+# GLFW/ImGui, OpenGL, OpenCV, and the MP4 encoder).
+-e .[test]
