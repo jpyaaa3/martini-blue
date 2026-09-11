@@ -17,6 +17,18 @@
     #telemetry { font-variant-numeric: tabular-nums; }
     .help { color: #b6c3d8; }
     button { pointer-events: auto; color: #fff; background: #c13f4b; border: 0; border-radius: 8px; padding: 9px 13px; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    .recording { position: fixed; left: 18px; right: 18px; bottom: 18px; max-width: 920px; }
+    .recording-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .recording input, .recording select { color: #e9eef8; background: #080b11; border: 1px solid #ffffff40; border-radius: 6px; padding: 8px; min-width: 0; }
+    #recording-file { flex: 1; min-width: 160px; }
+    #recording-browse { background: #33465e; }
+    #recording-start { background: #256849; }
+    #recording-status { margin-top: 8px; color: #b6c3d8; font-size: 13px; overflow-wrap: anywhere; }
+    #recording-status.error { color: #ff9da5; }
+    #recording-download { color: #a3caff; font-size: 13px; }
+    figcaption { bottom: 140px; }
+    @media (max-width: 700px) { .hud { gap: 6px; } .help { font-size: 12px; } .recording { left: 8px; right: 8px; bottom: 8px; } }
     .offline { opacity: .55; }
   </style>
 </head>
@@ -38,12 +50,69 @@
     </div>
     <button id="stop" type="button">Stop simulation</button>
   </div>
+  <section class="card recording" aria-label="Video recording">
+    <div class="recording-row" style="margin-bottom:10px">
+      <label><input id="blur-enabled" type="checkbox" disabled> Mounted motion blur</label>
+      <label for="shutter">Shutter 1/</label>
+      <input id="shutter" type="number" min="15" max="4000" step="1" value="120" style="width:85px" required disabled>
+      <span>s</span>
+      <span id="blur-status" role="status">Loading camera settings…</span>
+    </div>
+    <div class="recording-row">
+      <label for="recording-file">MP4 file</label>
+      <input id="recording-file" type="text" placeholder="recording.mp4" aria-describedby="recording-status" autocomplete="off" spellcheck="false">
+      <button id="recording-browse" type="button">Browse…</button>
+      <select id="recording-source" aria-label="Recording camera">
+        <option value="both">Both cameras</option>
+        <option value="mounted">Mounted camera</option>
+        <option value="observer">Third-person chase</option>
+      </select>
+      <button id="recording-start" type="button">Start recording</button>
+      <button id="recording-stop" type="button" disabled>Stop recording</button>
+    </div>
+    <div id="recording-status" role="status" aria-live="polite">Save destination: browser downloads. Use Browse to choose a folder.</div>
+    <a id="recording-download" hidden>Download MP4</a>
+  </section>
+  <script src="/static/recording.js"></script>
   <script>
     const held = new Set();
     const drivingKeys = new Set(['w', 'a', 's', 'd', 'space']);
     let reset = false;
     let stopped = false;
     const frameAge = {observer: null, mounted: null};
+    const recording = new ViewerRecording(() => stopped);
+    const blurEnabled = document.getElementById('blur-enabled');
+    const shutter = document.getElementById('shutter');
+    const blurStatus = document.getElementById('blur-status');
+    let blurSave = Promise.resolve();
+    let blurRevision = 0;
+    async function loadBlur() {
+      try {
+        const response = await fetch('/api/blur');
+        if (!response.ok) throw new Error('Could not load blur settings');
+        const settings = await response.json();
+        blurEnabled.checked = settings.enabled;
+        shutter.value = Math.round(1/settings.exposure_time_s);
+        blurEnabled.disabled = shutter.disabled = false;
+        blurStatus.textContent = settings.enabled ? 'Enabled · ' + (settings.exposure_time_s*1000).toFixed(2) + ' ms' : 'Off';
+      } catch (error) { blurStatus.textContent = error.message; }
+    }
+    function saveBlur() {
+      if (!shutter.reportValidity()) return;
+      const payload = {enabled: blurEnabled.checked, exposure_time_s: 1/Number(shutter.value)};
+      const revision = ++blurRevision;
+      blurStatus.textContent = 'Applying…';
+      blurSave = blurSave.then(async () => {
+        try {
+          const response = await fetch('/api/blur', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+          if (!response.ok) throw new Error('Could not apply blur settings');
+          if (revision === blurRevision) blurStatus.textContent = payload.enabled ? 'Enabled · ' + (payload.exposure_time_s*1000).toFixed(2) + ' ms' : 'Off';
+        } catch (error) { if (revision === blurRevision) blurStatus.textContent = error.message; }
+      });
+    }
+    blurEnabled.addEventListener('change', saveBlur);
+    shutter.addEventListener('input', saveBlur);
+    loadBlur();
 
     const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
@@ -73,6 +142,7 @@
             canvas.height = bitmap.height;
           }
           context.drawImage(bitmap, 0, 0);
+          canvas.dataset.ready = 'true';
           bitmap.close();
           if (Number.isFinite(nextSequence)) sequence = nextSequence;
           if (Number.isFinite(capturedAt)) {
@@ -98,11 +168,16 @@
       if (stopped) return;
       stopped = true;
       held.clear();
+      // Flush the MP4 before shutting down the viewer connection.
+      await recording.stop();
+      recording.updateButtons();
       await fetch('/api/quit', {method: 'POST'}).catch(() => {});
       document.body.classList.add('offline');
     }
 
     addEventListener('keydown', event => {
+      if (event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
+      if (event.target.closest('button, a') && [' ', 'Enter'].includes(event.key)) return;
       const key = controlKey(event);
       if (drivingKeys.has(key)) {
         held.add(key);
@@ -121,11 +196,15 @@
       const key = controlKey(event);
       if (drivingKeys.has(key)) {
         held.delete(key);
-        event.preventDefault();
+        if (!event.target.closest('input, select, textarea, button, a, [contenteditable="true"]')) event.preventDefault();
         sendControl();
       }
     });
     addEventListener('blur', () => {
+      held.clear();
+      sendControl();
+    });
+    document.querySelector('.recording').addEventListener('focusin', () => {
       held.clear();
       sendControl();
     });

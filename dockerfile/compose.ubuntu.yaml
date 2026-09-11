@@ -1,0 +1,31 @@
+# Standalone Ubuntu desktop configuration (X11 or Wayland via XWayland).
+name: vision-camera-demo
+services:
+  vision:
+    build:
+      context: ..
+      dockerfile: dockerfile/Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    image: vision-camera-demo:dev
+    container_name: vision-camera-demo
+    command: ["sleep", "infinity"]
+    gpus: all
+    shm_size: "2gb"
+    stdin_open: true
+    tty: true
+    environment:
+      DISPLAY: "${DISPLAY:-}"
+      XAUTHORITY: /tmp/vision.xauthority
+      PYOPENGL_PLATFORM: egl
+      VISION_HOST: 0.0.0.0
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    ports:
+      - "127.0.0.1:${VISION_PORT:-8765}:8765"
+    volumes:
+      - ..:/workspace/vision
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - ${XAUTHORITY:-/dev/null}:/tmp/vision.xauthority:ro
+    working_dir: /workspace/vision

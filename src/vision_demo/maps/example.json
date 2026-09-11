@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "roads": [
+    {"from": [-8, 0], "to": [8, 0], "width": 3.5},
+    {"from": [0, 0], "to": [0, 8], "width": 3.5}
+  ],
+  "sidewalks": [
+    {"position": [-4.75, 4.75], "size": [6, 6], "curb_width": 0.12},
+    {"position": [4.75, 4.75], "size": [6, 6], "curb_width": 0.12}
+  ],
+  "buildings": [
+    {"type": "house", "position": [-4, 4], "rotation": 0},
+    {"type": "market", "position": [4, 4], "rotation": -90}
+  ],
+  "trees": [
+    {"position": [-2.1, 6]},
+    {"position": [2.1, 6]}
+  ]
+}

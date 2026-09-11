@@ -16,6 +16,8 @@ import numpy as np
 from PIL import Image
 
 from .vehicle import ControlInput, VehicleState
+from .motion_blur import BlurSettings
+from dataclasses import asdict
 
 
 _CONTROL_DEADMAN_S = 0.30
@@ -39,6 +41,7 @@ class _ViewerState:
         self.control_at = 0.0
         self.reset_pending = False
         self.stop = False
+        self.blur = BlurSettings()
         self.telemetry: dict[str, float] = {
             "speed_mps": 0.0,
             "steering": 0.0,
@@ -90,10 +93,17 @@ class _Handler(BaseHTTPRequestHandler):
                 "text/html; charset=utf-8",
                 self.server.viewer_html,
             )
+        elif path == "/api/blur":
+            with self.server.viewer_state.lock:
+                body = json.dumps(asdict(self.server.viewer_state.blur)).encode()
+            self._send_bytes(HTTPStatus.OK, "application/json", body)
         elif path == "/api/state":
             with self.server.viewer_state.lock:
                 body = json.dumps(self.server.viewer_state.telemetry).encode()
             self._send_bytes(HTTPStatus.OK, "application/json", body)
+        elif path == "/static/recording.js":
+            script = Path(__file__).with_name("static") / "recording.js"
+            self._send_bytes(HTTPStatus.OK, "text/javascript; charset=utf-8", script.read_bytes())
         elif path in ("/frame/mounted.jpg", "/frame/observer.jpg"):
             raw_after = parse_qs(target.query).get("after", ["-1"])[0]
             try:
@@ -108,7 +118,16 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         body = self._json_body()
         state = self.server.viewer_state
-        if path == "/api/control":
+        if path == "/api/blur":
+            try:
+                settings = BlurSettings.parse(body)
+            except ValueError as exc:
+                self._send_bytes(HTTPStatus.BAD_REQUEST, "application/json", json.dumps({"error": str(exc)}).encode())
+                return
+            with state.lock:
+                state.blur = settings
+            self._send_bytes(HTTPStatus.OK, "application/json", json.dumps(asdict(settings)).encode())
+        elif path == "/api/control":
             allowed = {"w", "a", "s", "d", "space"}
             raw_keys = body.get("keys", [])
             if not isinstance(raw_keys, list):
@@ -201,6 +220,10 @@ class WebViewer:
             steer_right="d" in keys,
             handbrake="space" in keys,
         )
+
+    def blur_settings(self) -> BlurSettings:
+        with self._state.lock:
+            return self._state.blur
 
     def consume_reset(self) -> bool:
         with self._state.lock:

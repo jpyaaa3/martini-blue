@@ -13,6 +13,11 @@ dependencies = [
   "numpy>=1.26,<2",
   "Pillow==11.3.0",
   "trimesh>=4.8,<6",
+  "opencv-python-headless>=4.8,<4.12",
+  "imgui==2.0.0",
+  "glfw>=2.6,<3",
+  "PyOpenGL>=3.1.7,<4",
+  "imageio-ffmpeg>=0.5,<0.7",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +30,7 @@ vision-demo = "vision_demo.main:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-vision_demo = ["static/*.html", "assets/*.obj", "assets/*.mtl", "assets/*.png"]
+vision_demo = ["static/*.html", "static/*.js", "assets/*.obj", "assets/*.mtl", "assets/*.png", "maps/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

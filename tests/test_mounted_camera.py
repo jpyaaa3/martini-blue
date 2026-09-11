@@ -4,9 +4,28 @@ import pytest
 from vision_demo.mounted_camera import (
     forward_camera_offset,
     render_rgb,
+    render_rgb_depth,
     rgb_u8,
     third_person_camera_offset,
 )
+
+
+def test_rgb_depth_render_follows_attachment_and_keeps_depth_in_metres():
+    class Camera:
+        moved = False
+
+        def move_to_attach(self):
+            self.moved = True
+
+        def render(self, **kwargs):
+            assert self.moved
+            assert kwargs == {"rgb": True, "depth": True}
+            return np.zeros((2,3,3), dtype=np.uint8), np.full((2,3), 2.5), None, None
+
+    rgb, depth = render_rgb_depth(Camera())
+    assert rgb.shape == (2,3,3)
+    assert depth.dtype == np.float32
+    np.testing.assert_array_equal(depth, 2.5)
 
 
 def test_camera_offset_looks_along_block_positive_x() -> None:

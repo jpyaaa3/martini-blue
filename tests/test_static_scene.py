@@ -5,7 +5,8 @@ import trimesh
 from PIL import Image
 
 from vision_demo.static_scene import COLORS, build_static_scene
-from vision_demo.road_map import ASPHALT, three_crossroad_render_tiles
+from vision_demo.road_map import ASPHALT
+from vision_demo.map_file import DEFAULT_MAP, load_map, road_tiles
 
 
 ASSETS = Path(__file__).parents[1] / "src/vision_demo/assets"
@@ -28,15 +29,16 @@ def test_export_is_one_textured_mesh_and_matches_generator():
 
 def test_road_markings_are_baked_at_correct_world_positions():
     mesh, atlas = build_static_scene(ASSETS)
-    road_tiles = [t for t in three_crossroad_render_tiles() if t.material == ASPHALT]
+    tiles = road_tiles(load_map(DEFAULT_MAP))
+    road_rectangles = [t for t in tiles if t.material == ASPHALT]
     # Each road rectangle has four vertices and two upward-facing triangles.
-    assert len(road_tiles) == 7
+    assert len(road_rectangles) == 7
     assert np.all(mesh.face_normals[:14, 2] > 0.99)
-    for tile in three_crossroad_render_tiles():
+    for tile in tiles:
         if tile.material == ASPHALT:
             continue
         point = np.array(tile.center_xy_m)
-        for index, road in enumerate(road_tiles):
+        for index, road in enumerate(road_rectangles):
             low = np.array(road.center_xy_m) - np.array(road.size_xy_m) / 2
             fraction = (point - low) / road.size_xy_m
             if np.all((fraction >= 0) & (fraction <= 1)):

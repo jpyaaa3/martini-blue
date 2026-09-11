@@ -13,15 +13,20 @@ from .mounted_camera import (
     attach_to_first_link,
     forward_camera_offset,
     render_rgb,
+    render_rgb_depth,
     third_person_camera_offset,
 )
 from .road_map import ROAD_TOP_Z_M
+from .map_file import DEFAULT_MAP
+from .map_cache import prepare_map
 from .vehicle import VehicleConfig, VehicleState
-from .web_viewer import WebViewer
+from .viewer import start_viewer
+from .motion_blur import camera_twist, apply_motion_blur
 
 
 @dataclass(frozen=True)
 class AppConfig:
+    viewer: str = 'auto'
     backend: str = "gpu"
     camera_width: int = 960
     camera_height: int = 540
@@ -33,6 +38,8 @@ class AppConfig:
     camera_mount_obj: tuple[float, float, float] = (3.0, 0.0, 3.0)
     sky_color: tuple[float, float, float] = (0.529, 0.808, 0.922)
     ground_color: tuple[float, float, float, float] = (0.45, 0.45, 0.45, 1.0)
+    map_path: Path = DEFAULT_MAP
+    map_cache_dir: Path | None = None
 
 
 class VisionDemo:
@@ -47,6 +54,8 @@ class VisionDemo:
         self.observer_camera: Any = None
 
     def _create_scene(self) -> None:
+        asset_dir = Path(__file__).with_name("assets")
+        map_assets = prepare_map(self.config.map_path, asset_dir, self.config.map_cache_dir)
         print("[vision] importing Genesis...", flush=True)
         import genesis as gs
 
@@ -73,10 +82,9 @@ class VisionDemo:
             gs.morphs.Plane(),
             surface=gs.surfaces.Rough(color=self.config.ground_color),
         )
-        asset_dir = Path(__file__).with_name("assets")
         self.scene.add_entity(
             gs.morphs.Mesh(
-                file=str(asset_dir / "static_scene.obj"),
+                file=str(map_assets / "static_scene.obj"),
                 fixed=True,
                 collision=False,
                 decimate=False,
@@ -84,7 +92,7 @@ class VisionDemo:
             ),
             surface=gs.surfaces.Rough(
                 diffuse_texture=gs.textures.ImageTexture(
-                    image_path=str(asset_dir / "static_scene.png"),
+                    image_path=str(map_assets / "static_scene.png"),
                 ),
             ),
         )
@@ -146,9 +154,7 @@ class VisionDemo:
         self.block.set_quat(np.asarray(self.vehicle_state.quaternion_wxyz()))
 
     def run(self) -> None:
-        viewer = WebViewer(host=self.config.web_host, port=self.config.web_port)
-        viewer.start()
-        print(f"[vision] HTML viewer: http://localhost:{viewer.port}", flush=True)
+        viewer = start_viewer(self.config.viewer, self.config.web_host, self.config.web_port)
         last_tick = time.perf_counter()
         last_capture = 0.0
         capture_period = 1.0 / max(self.config.camera_max_fps, 1.0)
@@ -168,6 +174,7 @@ class VisionDemo:
                 )
                 if viewer.consume_reset():
                     self.vehicle_state.reset()
+                    previous_pose = (0., 0., 0.)
 
                 self.vehicle_state.update(controls, dt, self.vehicle_config)
                 current_pose = (
@@ -181,7 +188,16 @@ class VisionDemo:
 
                 if viewer.frame_requested() and now - last_capture >= capture_period:
                     capture_interval = now - last_capture
-                    viewer.publish_frame("mounted", render_rgb(self.camera))
+                    settings = viewer.blur_settings()
+                    mount = tuple(v*self.config.car_mesh_scale for v in self.config.camera_mount_obj)
+                    velocity, omega = camera_twist(previous_pose, current_pose, dt, mount)
+                    if settings.enabled and (np.linalg.norm(velocity) + np.linalg.norm(omega)) > 1e-6:
+                        mounted, depth = render_rgb_depth(self.camera)
+                        mounted = apply_motion_blur(mounted, depth, self.config.camera_fov_deg,
+                                                    velocity, omega, settings.exposure_time_s)
+                    else:
+                        mounted = render_rgb(self.camera)
+                    viewer.publish_frame("mounted", mounted)
                     viewer.publish_frame(
                         "observer",
                         render_rgb(self.observer_camera),

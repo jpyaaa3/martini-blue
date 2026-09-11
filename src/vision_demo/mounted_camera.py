@@ -104,3 +104,17 @@ def render_rgb(camera: Any, *, follow_attachment: bool = True) -> np.ndarray:
     if rgb is None:
         raise RuntimeError("Genesis camera returned no RGB frame")
     return rgb_u8(rgb)
+
+
+def render_rgb_depth(camera: Any) -> tuple[np.ndarray, np.ndarray]:
+    camera.move_to_attach()
+    result = camera.render(rgb=True, depth=True)
+    if not isinstance(result, (tuple, list)) or result[0] is None or result[1] is None:
+        raise RuntimeError("Genesis camera returned no RGB/depth frame")
+    rgb = rgb_u8(result[0])
+    depth = _as_numpy(result[1]).astype(np.float32)
+    if depth.shape == (*rgb.shape[:2], 1):
+        depth = depth[..., 0]
+    if depth.shape != rgb.shape[:2]:
+        raise RuntimeError(f"Unexpected depth shape: {depth.shape}")
+    return rgb, depth

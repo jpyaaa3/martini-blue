@@ -7,6 +7,8 @@ import numpy as np
 
 from vision_demo.vehicle import VehicleState
 from vision_demo.web_viewer import WebViewer
+from urllib.error import HTTPError
+import pytest
 
 
 def request(url: str, *, body: dict | None = None):
@@ -32,6 +34,14 @@ def test_html_viewer_serves_page_and_accepts_controls() -> None:
             assert b"Mounted Camera" in page
             assert b"'/frame/' + stream + '.jpg?after='" in page
             assert b"/stream/observer.mjpg" not in page
+            assert b"Start recording" in page
+            assert b"Stop recording" in page
+            assert b'"/static/recording.js"' in page
+
+        with request(base + "/static/recording.js") as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"].startswith("text/javascript")
+            assert b"class ViewerRecording" in response.read()
 
         with request(
             base + "/api/control",
@@ -110,3 +120,22 @@ def test_frame_demand_tracks_browser_requests() -> None:
     finally:
         viewer.close()
         thread.join(timeout=1.0)
+
+
+def test_runtime_blur_settings_and_validation():
+    viewer = WebViewer(host="127.0.0.1", port=0)
+    viewer.start()
+    base = f"http://127.0.0.1:{viewer.port}"
+    try:
+        with request(base + '/api/blur') as response:
+            assert json.load(response)['enabled'] is False
+        settings = {'enabled': True, 'exposure_time_s': 1/60}
+        with request(base + '/api/blur', body=settings) as response:
+            assert json.load(response) == settings
+        assert viewer.blur_settings().exposure_time_s == 1/60
+        with pytest.raises(HTTPError) as error:
+            request(base + '/api/blur', body={'enabled': True, 'exposure_time_s': 0})
+        assert error.value.code == 400
+        assert viewer.blur_settings().exposure_time_s == 1/60
+    finally:
+        viewer.close()
